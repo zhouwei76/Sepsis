@@ -1,0 +1,56 @@
+
+library(gwasglue)
+library(TwoSampleMR)
+Sys.setenv(OPENGWAS_JWT="token key")
+
+kb=1000000        
+drugFile="IEUid.txt"      
+
+
+workDir="Working path"
+setwd(workDir)
+
+
+rt=read.table(drugFile, header=T, sep="\t", check.names=F)
+row.names(rt)=rt[,2]
+
+
+dat=data.frame()
+for(id in row.names(rt)){
+	geneChr=rt[id, "Chr"]
+	geneStart=rt[id, "Start"]
+	geneEnd=rt[id, "End"]
+	
+	possibleError=tryCatch({
+		exposure_dat <- extract_instruments(outcome=id, p1=5e-08, p2=5e-08, clump=F)
+		
+		
+		geneData<-subset(exposure_dat, chr.exposure==geneChr & pos.exposure>(geneStart-kb) & pos.exposure<(geneEnd+kb))
+	
+		geneData<-subset(geneData, eaf.exposure>0.01)
+		
+		
+		snpData=geneData[,c("SNP", "pval.exposure")]
+		colnames(snpData)=c("rsid", "pval" )
+		result=ld_clump_local(dat=snpData, clump_kb=10000, clump_r2=0.001, clump_p=1, 
+			                  bfile = paste0(workDir, "\\data_maf0.01_rs_ref\\data_maf0.01_rs_ref"),
+			                  plink_bin = paste0(workDir, "\\plink_win64\\plink.exe") )
+		
+	
+		expoData=geneData[which(geneData$SNP %in% result$rsid),]
+		dat=rbind(dat, expoData)
+	},error=function(e) e)
+    if(inherits(possibleError, "error")){next}
+}
+
+
+dat$R2<-(2*dat$beta.exposure*dat$beta.exposure*dat$eaf.exposure*(1-dat$eaf.exposure)/(2*dat$beta.exposure*dat$beta.exposure*dat$eaf.exposure*(1-dat$eaf.exposure)+2*dat$se.exposure*dat$se.exposure*dat$samplesize.exposure*dat$eaf.exposure*(1-dat$eaf.exposure)))     
+dat$F<-dat$R2*(dat$samplesize.exposure-2)/(1-dat$R2)     
+
+
+outTab=dat[as.numeric(dat$F)>10,]
+write.csv(outTab, file="exposure.F4.100kb.csv", row.names=F)
+
+
+
+
