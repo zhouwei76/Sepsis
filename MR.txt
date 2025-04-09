@@ -6,7 +6,7 @@ Sys.setenv(OPENGWAS_JWT="token key")
 
 
 
-exposureFile="exposure.F.csv"       
+exposureFile="S3.csv"       
 outcomeFile="ieu-b-4980.vcf.gz"       
 outcomeName="Sepsis"      
 setwd("Working path")   
